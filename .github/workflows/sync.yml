@@ -1,0 +1,74 @@
+name: Upstream Sync
+
+permissions:
+  contents: write
+
+on:
+  schedule:
+    - cron: "0 0 * * *"  # every day
+  workflow_dispatch:
+
+jobs:
+  sync_latest_from_upstream:
+    name: Sync latest commits from upstream repo
+    runs-on: ubuntu-latest
+    if: ${{ github.event.repository.fork }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Configure Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+      
+      - name: Add upstream repository and fetch
+        run: |
+          git remote add upstream https://github.com/macrozheng/mall.git
+          git fetch upstream master dev-v3
+      
+      - name: Sync master branch
+        run: |
+          # Switch to master branch
+          git checkout master
+          
+          # Store current workflow file changes
+          git stash push .github/workflows/sync.yml || true
+          
+          # Try to merge upstream changes
+          git merge upstream/master --no-edit || true
+          
+          # Restore workflow file
+          git stash pop || true
+          
+          # Add changes and commit
+          git add .
+          git commit -m "Merge upstream master branch while preserving workflow" || echo "No changes to commit"
+          
+          # Push changes
+          git push origin master
+      
+      - name: Sync dev-v3 branch
+        run: |
+          # Switch to dev-v3 branch
+          git checkout dev-v3 || git checkout -b dev-v3
+          
+          # Store current workflow file changes
+          git stash push .github/workflows/sync.yml || true
+          
+          # Try to merge upstream changes
+          git merge upstream/dev-v3 --no-edit || true
+          
+          # Restore workflow file
+          git stash pop || true
+          
+          # Add changes and commit
+          git add .
+          git commit -m "Merge upstream dev-v3 branch while preserving workflow" || echo "No changes to commit"
+          
+          # Push changes
+          git push origin dev-v3
